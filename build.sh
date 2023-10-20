@@ -1,0 +1,2 @@
+#! /bin/sh
+protoc --go_out=. --go_opt=Mgtfs-realtime.proto=./transit_realtime,Mgtfs-realtime-OneBusAway.proto=./transit_realtime,Mgtfs-realtime-NYCT.proto=./transit_realtime ./gtfs-realtime.proto ./gtfs-realtime-OneBusAway.proto ./gtfs-realtime-NYCT.proto
