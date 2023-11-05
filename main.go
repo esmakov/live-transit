@@ -3,11 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"html/template"
 	"io"
-	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	rt "transit_realtime"
@@ -21,75 +20,66 @@ func main() {
 	alerts_endpoint := "https://api-endpoint.mta.info/Dataservice/mtagtfsfeeds/camsys%2Fsubway-alerts"
 	req, err := http.NewRequest("GET", alerts_endpoint, nil)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	if err := godotenv.Load(); err != nil {
-		log.Fatalln("Couldn't load .env")
+		fmt.Println(err)
 	}
+
 	apiKey := os.Getenv("MTA_API_KEY")
 	if apiKey == "" {
-		log.Fatalln("API_KEY environment variable is not set.")
+		fmt.Println("API_KEY environment variable is not set.")
 	}
 
 	req.Header["x-api-key"] = []string{apiKey}
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	msg := &rt.FeedMessage{}
 
 	if err := proto.Unmarshal(body, msg); err != nil {
-		log.Fatalln("Failed to parse FeedMessage:", err)
+		fmt.Println("Failed to parse FeedMessage:", err)
 	}
 
-	stationMap := makeStationMap()
-
-	printMessage(msg, stationMap)
-}
-
-func makeStationMap() map[string]string {
-	file, err := os.Open("stationmappings.txt")
+	fd, err := os.Open("template.html")
 	if err != nil {
-		log.Fatalln(err)
-	}
-	defer file.Close()
-
-	sm := make(map[string]string)
-
-	scanner := bufio.NewScanner(file)
-	if scanner.Scan() {
-		header := scanner.Text()
-		fmt.Println(header)
+		fmt.Println(err)
 	}
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		fields := strings.Split(line, "\t")
-		if len(fields) < 2 {
-			fmt.Println("Error: Insufficient columns in the line")
-			continue
+	r := bufio.NewReader(fd)
+	bytes, err := io.ReadAll(r)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	tmpl, err := template.New("test").Parse(string(bytes))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	data := msg.GetEntity()
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if err := http.reqChecker(r.Body); err != nil {
+            fmt.Println(err)
 		}
-		gtfsStopID := strings.Trim(fields[0], `"`)
-		stopName := strings.Trim(fields[1], `"`)
-		sm[gtfsStopID] = stopName
-	}
-	if err := scanner.Err(); err != nil {
-		log.Fatalln("Could not scan line")
+		tmpl.Execute(w, data)
 	}
 
-	return sm
+	http.HandleFunc("/", handler)
+	fmt.Println(http.ListenAndServe(":80", nil))
 }
 
-func printMessage(msg *rt.FeedMessage, stationMap map[string]string) {
+func printMessage(msg *rt.FeedMessage) {
 	fmt.Println(msg.GetHeader())
 	for _, entity := range msg.GetEntity() {
 		alert := entity.GetAlert()
@@ -102,28 +92,11 @@ func printMessage(msg *rt.FeedMessage, stationMap map[string]string) {
 			localEndTime := time.Unix(int64(*timeRange.End), 0)
 
 			// "Alerts are always for trips, so entities are TripDescriptors"
-			affectedRoutes := alert.GetInformedEntity()
 			if alert.GetInformedEntity()[0].GetRouteId() == "" {
 				fmt.Println("Couldn't parse train:", alert.GetInformedEntity())
 			} else {
 				fmt.Println("Active alert:", alert.GetHeaderText().GetTranslation()[0].GetText(),
 					" from", localStartTime, "to", localEndTime)
-				fmt.Println("\tTrip description:")
-				for i, v := range affectedRoutes {
-					if route := v.GetRouteId(); route != "" {
-						fmt.Print("\tAffecting the ", route, " train at station(s): ")
-					} else if stop := v.GetStopId(); stop != "" {
-						if v, ok := stationMap[stop]; ok {
-							fmt.Print(v)
-						} else {
-							fmt.Print(stop)
-						}
-
-						if i < len(affectedRoutes)-1 {
-							fmt.Print(", ")
-						}
-					}
-				}
 				fmt.Println()
 			}
 		} else if timeRange.End == nil {

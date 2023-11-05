@@ -7,6 +7,6 @@ require (
 	transit_realtime v0.0.0
 )
 
-require github.com/joho/godotenv v1.5.1 // indirect
+require github.com/joho/godotenv v1.5.1
 
 replace transit_realtime v0.0.0 => ./transit_realtime
