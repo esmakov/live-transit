@@ -1,8 +1,52 @@
 <html>
   <head>
-    <title>Test</title>
+    <title>MTA Alerts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
   </head>
-  <body>
-    {{.String}}
+  <body class="bg-slate-800 text-gray-200">
+      <h1 class="py-4 text-center text-4xl">Realtime MTA Alerts</h1>
+      <div class="flex justify-center">
+          <div class="flex flex-col gap-8 px-8 md:px-16 lg:px-32">
+              {{range .AlertGroups}}
+              <section class="max-w-3xl">
+                  {{if .RouteID}}
+                  <h3 class="font-bold text-3xl">{{.RouteID}} train:</h3>
+                  {{else}}
+                  <h3 class="font-bold text-3xl">Elevators:</h3>
+                  {{end}}
+
+                  <h4 class="text-2xl">Current Alerts</h4>
+                  <div class="flex flex-col gap-4">
+                      {{range .Alerts}}
+                          {{if .HasStarted}}
+                          <div>
+                              <p class="text-gray-400">
+                                From {{.TimeStart}} to {{if .TimeEnd}} {{.TimeEnd}} {{else}} INDEFINITELY {{end}}
+                              </p>
+                              {{.Summary}}
+                          </div>
+                          {{end}}
+                      {{end}}
+                  </div>
+
+                  <h4 class="text-2xl">Future Alerts</h4>
+                  <div class="flex flex-col gap-4">
+                      {{range .Alerts}}
+                          {{if .HasStarted}}
+                          {{else}}
+                          <div>
+                              <p class="text-gray-400">
+                                From {{.TimeStart}} to {{if .TimeEnd}} {{.TimeEnd}} {{else}} INDEFINITELY {{end}}
+                              </p>
+                              {{.Summary}}
+                          </div>
+                          {{end}}
+                      {{end}}
+                  </div>
+              </section>
+              {{end}}
+          </div>
+      </div>
+      <div class="py-4"></div>
   </body>
 </html>
